@@ -1,55 +1,137 @@
-const timeElement = document.querySelector(".time");
-const dateElement = document.querySelector(".date");
+function activate() {
+	document.head.insertAdjacentHTML("beforeend", `
+		<style>
+			.time-picker {
+				position: absolute;
+				display: inline-block;
+				padding: 10px;
+				background: #eeeeee;
+				border-radius: 6px;
+			}
 
-/**
- * @param {Date} date
- */
-function formatTime(date) {
-  const hours12 = date.getHours() % 12 || 12;
-  const minutes = date.getMinutes();
-  const isAm = date.getHours() < 12;
+			.time-picker__select {
+				-webkit-appearance: none;
+				-moz-appearance: none;
+				appearance: none;
+				outline: none;
+				text-align: center;
+				border: 1px solid #dddddd;
+				border-radius: 6px;
+				padding: 6px 10px;
+				background: #ffffff;
+				cursor: pointer;
+				font-family: 'Heebo', sans-serif;
+			}
+		</style>
+	`);
 
-  return `${hours12.toString().padStart(2, "0")}:${minutes
-    .toString()
-    .padStart(2, "0")} ${isAm ? "AM" : "PM"}`;
+	document.querySelectorAll(".time-pickable").forEach(timePickable => {
+		let activePicker = null;
+
+		timePickable.addEventListener("focus", () => {
+			if (activePicker) return;
+
+			activePicker = show(timePickable);
+
+			const onClickAway = ({ target }) => {
+				if (
+					target === activePicker
+					|| target === timePickable
+					|| activePicker.contains(target)
+				) {
+					return;
+				}
+
+				document.removeEventListener("mousedown", onClickAway);
+				document.body.removeChild(activePicker);
+				activePicker = null;
+			};
+
+			document.addEventListener("mousedown", onClickAway);
+		});
+	});
 }
 
-/**
- * @param {Date} date
- */
-function formatDate(date) {
-  const DAYS = [
-    "Sunday",
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday"
-  ];
-  const MONTHS = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December"
-  ];
+function show(timePickable) {
+	const picker = buildPicker(timePickable);
+	const { bottom: top, left } = timePickable.getBoundingClientRect();
 
-  return `${DAYS[date.getDay()]}, ${
-    MONTHS[date.getMonth()]
-  } ${date.getDate()} ${date.getFullYear()}`;
+	picker.style.top = `${top}px`;
+	picker.style.left = `${left}px`;
+
+	document.body.appendChild(picker);
+
+	return picker;
 }
 
-setInterval(() => {
-  const now = new Date();
+function buildPicker(timePickable) {
+	const picker = document.createElement("div");
+	const hourOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(numberToOption);
+	const minuteOptions = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(numberToOption);
 
-  timeElement.textContent = formatTime(now);
-  dateElement.textContent = formatDate(now);
-}, 200);
+	picker.classList.add("time-picker");
+	picker.innerHTML = `
+		<select class="time-picker__select">
+			${hourOptions.join("")}
+		</select>
+		:
+		<select class="time-picker__select">
+			${minuteOptions.join("")}
+		</select>
+		<select class="time-picker__select">
+			<option value="am">am</option>
+			<option value="pm">pm</option>
+		</select>
+	`;
+
+	const selects = getSelectsFromPicker(picker);
+
+	selects.hour.addEventListener("change", () => timePickable.value = getTimeStringFromPicker(picker));
+	selects.minute.addEventListener("change", () => timePickable.value = getTimeStringFromPicker(picker));
+	selects.meridiem.addEventListener("change", () => timePickable.value = getTimeStringFromPicker(picker));
+
+	if (timePickable.value) {
+		const { hour, minute, meridiem } = getTimePartsFromPickable(timePickable);
+
+		selects.hour.value = hour;
+		selects.minute.value = minute;
+		selects.meridiem.value = meridiem;
+	}
+
+	return picker;
+}
+
+function getTimePartsFromPickable(timePickable) {
+	const pattern = /^(\d+):(\d+) (am|pm)$/;
+	const [hour, minute, meridiem] = Array.from(timePickable.value.match(pattern)).splice(1);
+
+	return {
+		hour,
+		minute,
+		meridiem
+	};
+}
+
+function getSelectsFromPicker(timePicker) {
+	const [hour, minute, meridiem] = timePicker.querySelectorAll(".time-picker__select");
+
+	return {
+		hour,
+		minute,
+		meridiem
+	};
+}
+
+function getTimeStringFromPicker(timePicker) {
+	const selects = getSelectsFromPicker(timePicker);
+
+	return `${selects.hour.value}:${selects.minute.value} ${selects.meridiem.value}`;
+}
+
+function numberToOption(number) {
+	const padded = number.toString().padStart(2, "0");
+
+	return `<option value="${padded}">${padded}</option>`;
+}
+
+activate();
